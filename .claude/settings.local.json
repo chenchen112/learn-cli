@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm list:*)",
+      "Bash(npm config:*)",
+      "Bash(npm link:*)",
+      "Bash(npm bin:*)",
+      "Bash(npm prefix:*)",
+      "Bash(mkdir -p \"C:/software/nvm4w/nodejs/bin\")",
+      "Bash(learn-cli:*)"
+    ]
+  }
+}
