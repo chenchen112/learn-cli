@@ -1,33 +1,16 @@
-const commander = require("commander");
 const fs = require("fs-extra");
 const path = require("path");
+const {
+  getLatestVersion,
+  getTemplateFiles,
+} = require("./templates/versions.js");
 
-const program = new commander.Command();
-
-module.exports = async function create() {
+module.exports = async function create(options = {}) {
   const chalk = (await import("chalk")).default;
   const inquirer = (await import("inquirer")).default;
   const ora = (await import("ora")).default;
 
-  return new Promise((resolve, reject) => {
-    console.log("------------create start------------");
-
-    program
-      .command("create")
-      .alias("init")
-      .description("新建一个 output.js 文件")
-      .option("-f,--force", "如果有就覆盖")
-      .action(async (options) => {
-        try {
-          await init(options, chalk, inquirer, ora);
-          resolve();
-        } catch (error) {
-          reject(error);
-        }
-      });
-
-    program.parse();
-  });
+  await init(options, chalk, inquirer, ora);
 };
 
 function delay(time = 1000) {
@@ -37,8 +20,6 @@ function delay(time = 1000) {
 }
 
 async function init(options, chalk, inquirer, ora) {
-  console.log("------------init start------------");
-
   try {
     const { choose } = await inquirer.prompt([
       {
@@ -49,69 +30,81 @@ async function init(options, chalk, inquirer, ora) {
       },
     ]);
 
-    const waiting = ora("正在创建文件...");
+    const latestVersion = getLatestVersion(choose);
+    if (!latestVersion) {
+      throw new Error(`未找到模板: ${choose}`);
+    }
+
+    const templateData = getTemplateFiles(choose, latestVersion);
+    if (!templateData) {
+      throw new Error(`无法获取模板 ${choose}@${latestVersion}`);
+    }
+
+    const waiting = ora(`正在创建 ${choose} 项目 (v${latestVersion})...`);
     waiting.start();
 
     await delay(500);
 
-    const fileName = "output.js";
-    const filePath = path.join(process.cwd(), fileName);
+    const targetDir = process.cwd();
+    const generatedFiles = [];
+    const overwrittenFiles = [];
 
-    if ((await fs.pathExists(filePath)) && !options.force) {
-      waiting.fail(`文件 ${fileName} 已存在，请使用 --force 选项覆盖`);
-      return;
+    for (const [fileName, content] of Object.entries(templateData.files)) {
+      const filePath = path.join(targetDir, fileName);
+
+      if ((await fs.pathExists(filePath)) && !options.force) {
+        waiting.fail(`文件 ${fileName} 已存在，请使用 --force 选项覆盖`);
+        return;
+      }
+
+      await fs.writeFile(filePath, content);
+
+      if ((await fs.pathExists(filePath)) && options.force) {
+        overwrittenFiles.push(fileName);
+      }
+      generatedFiles.push(fileName);
     }
 
-    const template = getTemplate(choose);
-    await fs.writeFile(filePath, template);
+    const metaInfo = {
+      templateName: choose,
+      templateVersion: latestVersion,
+      createdAt: new Date().toISOString(),
+      files: generatedFiles,
+      cliVersion: require("../package.json").version,
+    };
+
+    const metaPath = path.join(targetDir, ".learn-cli.json");
+    if (!(await fs.pathExists(metaPath)) || options.force) {
+      await fs.writeJson(metaPath, metaInfo, { spaces: 2 });
+      if (!generatedFiles.includes(".learn-cli.json")) {
+        generatedFiles.push(".learn-cli.json");
+      }
+    }
 
     waiting.succeed();
     console.log(
-      chalk.green(`✅ 成功创建 ${chalk.blue.underline.bold(fileName)} 文件!`),
+      chalk.green(`✅ 成功创建 ${chalk.blue.underline.bold(choose)} 项目!`),
     );
-    console.log(chalk.gray(`📁 文件位置: ${filePath}`));
+    console.log(chalk.gray(`📦 模板版本: v${latestVersion}`));
+    console.log(chalk.gray(`📁 生成文件:`));
+    generatedFiles.forEach((f) => {
+      console.log(chalk.gray(`   - ${f}`));
+    });
+
+    if (overwrittenFiles.length > 0) {
+      console.log(chalk.yellow(`\n⚠️  以下文件已被覆盖:`));
+      overwrittenFiles.forEach((f) => {
+        console.log(chalk.yellow(`   - ${f}`));
+      });
+    }
+
+    console.log(
+      chalk.cyan(
+        `\n💡 提示: 运行 ${chalk.bold("npx learn-cli update")} 可检查模板更新`,
+      ),
+    );
   } catch (error) {
-    console.error(chalk.red("❌ 创建文件失败:"), error.message);
+    console.error(chalk.red("❌ 创建项目失败:"), error.message);
     throw error;
   }
-}
-
-function getTemplate(type) {
-  const templates = {
-    "basic-js": `// Basic JavaScript Template
-console.log('Hello from ${type} template!');
-
-module.exports = {
-  greet: function() {
-    return 'Hello World!';
-  }
-};
-`,
-    "node-module": `// Node.js Module Template
-const path = require('path');
-
-class MyModule {
-  constructor() {
-    this.name = '${type}';
-  }
-  
-  getName() {
-    return this.name;
-  }
-}
-
-module.exports = MyModule;
-`,
-    "cli-tool": `#!/usr/bin/env node
-// CLI Tool Template
-const chalk = require('chalk');
-
-console.log(chalk.green('🚀 CLI Tool Started!'));
-console.log(chalk.blue('Template type: ${type}'));
-
-// Add your CLI logic here
-`,
-  };
-
-  return templates[type] || templates["basic-js"];
 }
