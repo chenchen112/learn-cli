@@ -24,7 +24,7 @@ async function init(options, chalk, inquirer, ora) {
     const { choose } = await inquirer.prompt([
       {
         name: "choose",
-        type: "list",
+        type: "select",
         message: "请选择要创建的模板类型",
         choices: ["basic-js", "node-module", "cli-tool"],
       },

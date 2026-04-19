@@ -1,7 +1,6 @@
 #! /usr/bin/env node
 
 const commander = require("commander");
-const chalk = require("chalk");
 
 const program = new commander.Command();
 
@@ -9,6 +8,8 @@ const createHandler = require("../scripts/create.js");
 const updateHandler = require("../scripts/update.js");
 
 async function main() {
+  const chalk = (await import("chalk")).default;
+
   try {
     console.log("------------cli start------------");
 

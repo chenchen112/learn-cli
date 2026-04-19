@@ -139,6 +139,7 @@ async function runUpdate(options, chalk, inquirer, ora) {
     metaInfo,
     chalk,
     ora,
+    options,
   );
 }
 
@@ -211,6 +212,7 @@ async function executeUpdate(
   metaInfo,
   chalk,
   ora,
+  options,
 ) {
   const waiting = ora("正在更新文件...").start();
   let updatedCount = 0;
@@ -232,7 +234,7 @@ async function executeUpdate(
       const { action } = await inquirer.prompt([
         {
           name: "action",
-          type: "list",
+          type: "select",
           message: `文件 ${chalk.yellow(file.fileName)} 已被你修改过，如何处理?`,
           choices: [
             {
@@ -250,7 +252,7 @@ async function executeUpdate(
         const { finalAction } = await inquirer.prompt([
           {
             name: "finalAction",
-            type: "list",
+            type: "select",
             message: "选择操作:",
             choices: [
               { name: "覆盖为新版", value: "overwrite" },
